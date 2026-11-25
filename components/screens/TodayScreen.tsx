@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -241,17 +242,13 @@ export function TodayScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: top + 8 }]}>
-        <Pressable
-          style={styles.iconBtn}
-          hitSlop={8}
-          onPress={() => setDayOffset(0)}
-        >
-          <MaterialCommunityIcons
-            name="chevron-left"
-            size={24}
-            color={colors.text}
+        <View style={styles.headerBrand}>
+          <Image
+            source={require("../../assets/header-icon.png")}
+            style={styles.headerBrandIcon}
+            accessibilityLabel="App logo"
           />
-        </Pressable>
+        </View>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>{dateLabel}</Text>
           <View style={styles.dateRow}>
@@ -524,6 +521,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingBottom: 8,
+  },
+  headerBrand: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerBrandIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
   },
   iconBtn: {
     width: 40,

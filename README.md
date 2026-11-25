@@ -50,7 +50,8 @@ lib/
   format.ts             # Currency
   theme.ts              # Colors + shared styles
 assets/
-  icon.png              # App + splash (from shop logo)
+  icon.png              # Launcher / splash (from app-assets 192)
+  header-icon.png       # Home header + login (from app-assets 96)
   android-icon-foreground.png
   splash-icon.png
 ```

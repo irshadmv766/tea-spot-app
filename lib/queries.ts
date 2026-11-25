@@ -33,7 +33,7 @@ function sum(rows: { amount?: number; total_amount?: number }[]): number {
 export async function loadActiveProducts(): Promise<ProductRow[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, selling_price")
+    .select("id, name, selling_price, image_path")
     .eq("is_active", true)
     .order("name");
   if (error) throw error;
@@ -299,7 +299,7 @@ export async function listAdminProducts(): Promise<AdminProduct[]> {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "id, name, selling_price, cost_price, category_id, description, is_active, category:categories(name)"
+      "id, name, selling_price, cost_price, category_id, description, image_path, is_active, category:categories(name)"
     )
     .order("name");
   if (error) throw error;
@@ -312,6 +312,7 @@ export async function listAdminProducts(): Promise<AdminProduct[]> {
     category_id: row.category_id,
     categoryName: pickName(row.category),
     description: row.description,
+    image_path: row.image_path,
     is_active: row.is_active,
   }));
 }

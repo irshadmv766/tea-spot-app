@@ -7,6 +7,7 @@ export type ProductRow = {
   id: string;
   name: string;
   selling_price: number;
+  image_path: string | null;
 };
 
 export type AdminProduct = {
@@ -17,6 +18,7 @@ export type AdminProduct = {
   category_id: string | null;
   categoryName: string | null;
   description: string | null;
+  image_path: string | null;
   is_active: boolean;
 };
 

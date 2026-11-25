@@ -1,8 +1,10 @@
 import { Picker } from "@react-native-picker/picker";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   ActivityIndicator,
   FlatList,
+  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -18,6 +20,7 @@ import {
 } from "../../lib/queries";
 import type { CartLine, ProductRow } from "../../lib/types";
 import { formatMoney } from "../../lib/format";
+import { productImagePublicUrl } from "../../lib/product-image";
 import {
   applyManualSaleTotal,
   cartLinesTotal,
@@ -341,23 +344,64 @@ export function SaleScreen({
           ) : undefined
         }
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.productChip}
-            onPress={() => addProduct(item)}
-          >
-            <Text style={styles.productName} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <Text style={styles.productPrice}>
-              {formatMoney(Number(item.selling_price))}
-            </Text>
-          </Pressable>
+          <SaleProductTile product={item} onPress={() => addProduct(item)} />
         )}
         ListEmptyComponent={
           <Text style={styles.empty}>No active products in the catalog.</Text>
         }
       />
     </View>
+  );
+}
+
+function SaleProductTile({
+  product,
+  onPress,
+}: {
+  product: ProductRow;
+  onPress: () => void;
+}) {
+  const imageUrl = productImagePublicUrl(product.image_path);
+
+  if (imageUrl) {
+    return (
+      <Pressable
+        style={[styles.productChip, styles.productChipWithPhoto]}
+        onPress={onPress}
+      >
+        <ImageBackground
+          source={{ uri: imageUrl }}
+          style={styles.productPhotoBg}
+          imageStyle={styles.productPhotoImage}
+        >
+          <LinearGradient
+            colors={["rgba(255,255,255,0.9)", "rgba(232,240,228,0.55)"]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.productPhotoContent}>
+            <Text style={styles.productNameOnPhoto} numberOfLines={2}>
+              {product.name}
+            </Text>
+            <View style={styles.pricePill}>
+              <Text style={styles.productPriceOnPhoto}>
+                {formatMoney(Number(product.selling_price))}
+              </Text>
+            </View>
+          </View>
+        </ImageBackground>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable style={styles.productChip} onPress={onPress}>
+      <Text style={styles.productName} numberOfLines={2}>
+        {product.name}
+      </Text>
+      <Text style={styles.productPrice}>
+        {formatMoney(Number(product.selling_price))}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -369,11 +413,51 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: 14,
     borderWidth: 1,
     borderColor: "#e8ecef",
-    minHeight: 88,
+    minHeight: 100,
+    overflow: "hidden",
     justifyContent: "space-between",
+    padding: 14,
+  },
+  productChipWithPhoto: {
+    padding: 0,
+    minHeight: 108,
+  },
+  productPhotoBg: {
+    flex: 1,
+    minHeight: 106,
+    justifyContent: "flex-end",
+  },
+  productPhotoImage: {
+    borderRadius: 11,
+  },
+  productPhotoContent: {
+    flex: 1,
+    padding: 12,
+    justifyContent: "space-between",
+  },
+  productNameOnPhoto: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.text,
+    textShadowColor: "rgba(255,255,255,0.9)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  pricePill: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(27,94,67,0.15)",
+  },
+  productPriceOnPhoto: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.primary,
   },
   productName: { fontSize: 15, fontWeight: "600", color: colors.text },
   productPrice: {

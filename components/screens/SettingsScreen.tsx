@@ -42,6 +42,11 @@ import type {
   ShopSettings,
 } from "../../lib/types";
 import { useFeedback } from "../feedback/FeedbackProvider";
+import {
+  deleteProductImageFile,
+  uploadProductImage,
+} from "../../lib/product-image";
+import { ProductPhotoField } from "../ui/ProductPhotoField";
 import { ScreenHeader } from "../ui/ScreenHeader";
 
 type Section = "products" | "categories" | "shop" | "account";
@@ -103,6 +108,12 @@ export function SettingsScreen({
   );
   const [editProductActive, setEditProductActive] = useState(true);
   const [editCategoryActive, setEditCategoryActive] = useState(true);
+  const [productImageLocalUri, setProductImageLocalUri] = useState<string | null>(
+    null
+  );
+  const [productImagePath, setProductImagePath] = useState<string | null>(null);
+  const [productImageRemoved, setProductImageRemoved] = useState(false);
+  const [pickingProductPhoto, setPickingProductPhoto] = useState(false);
 
   function resetProductFields() {
     setNewProductName("");
@@ -111,6 +122,27 @@ export function SettingsScreen({
     setNewProductCategoryId("");
     setNewProductDesc("");
     setEditProductActive(true);
+    setProductImageLocalUri(null);
+    setProductImagePath(null);
+    setProductImageRemoved(false);
+  }
+
+  async function resolveProductImagePath(
+    productId: string
+  ): Promise<string | null> {
+    if (productImageLocalUri) {
+      if (productImagePath) {
+        await deleteProductImageFile(productImagePath).catch(() => {});
+      }
+      return uploadProductImage(productId, productImageLocalUri);
+    }
+    if (productImageRemoved) {
+      if (productImagePath) {
+        await deleteProductImageFile(productImagePath).catch(() => {});
+      }
+      return null;
+    }
+    return productImagePath;
   }
 
   function resetCategoryFields() {
@@ -155,6 +187,9 @@ export function SettingsScreen({
     setNewProductCategoryId(p.category_id ?? "");
     setNewProductDesc(p.description ?? "");
     setEditProductActive(p.is_active);
+    setProductImagePath(p.image_path);
+    setProductImageLocalUri(null);
+    setProductImageRemoved(false);
   }
 
   function openEditCategory(c: AdminCategory) {
@@ -217,13 +252,25 @@ export function SettingsScreen({
     const price = Number(newProductPrice);
     const cost = newProductCost ? Number(newProductCost) : null;
     try {
-      await createProduct({
+      const id = await createProduct({
         name: newProductName,
         selling_price: price,
         cost_price: cost,
         category_id: newProductCategoryId || null,
         description: newProductDesc || null,
       });
+      if (productImageLocalUri) {
+        const imagePath = await resolveProductImagePath(id);
+        await updateProduct(id, {
+          name: newProductName,
+          selling_price: price,
+          cost_price: cost,
+          category_id: newProductCategoryId || null,
+          description: newProductDesc || null,
+          image_path: imagePath,
+          is_active: true,
+        });
+      }
       setNewProductName("");
       setNewProductPrice("");
       setNewProductCost("");
@@ -267,12 +314,14 @@ export function SettingsScreen({
     const price = Number(newProductPrice);
     const cost = newProductCost ? Number(newProductCost) : null;
     try {
+      const imagePath = await resolveProductImagePath(editingProductId);
       await updateProduct(editingProductId, {
         name: newProductName,
         selling_price: price,
         cost_price: cost,
         category_id: newProductCategoryId || null,
         description: newProductDesc || null,
+        image_path: imagePath,
         is_active: editProductActive,
       });
       closeProductForm();
@@ -492,6 +541,24 @@ export function SettingsScreen({
                     value={newProductDesc}
                     onChange={setNewProductDesc}
                     multiline
+                  />
+                  <ProductPhotoField
+                    localUri={productImageLocalUri}
+                    storedPath={productImagePath}
+                    removed={productImageRemoved}
+                    picking={pickingProductPhoto}
+                    onPickingChange={setPickingProductPhoto}
+                    onPick={(uri) => {
+                      setProductImageLocalUri(uri);
+                      setProductImageRemoved(false);
+                    }}
+                    onRemove={() => {
+                      setProductImageLocalUri(null);
+                      setProductImageRemoved(true);
+                    }}
+                    onError={(message) =>
+                      feedback.error("Photo", message)
+                    }
                   />
                   {editingProductId ? (
                     <View style={styles.switchRow}>

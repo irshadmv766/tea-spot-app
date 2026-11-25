@@ -250,22 +250,29 @@ export async function createProduct(input: {
   cost_price?: number | null;
   category_id?: string | null;
   description?: string | null;
-}) {
+  image_path?: string | null;
+}): Promise<string> {
   const name = input.name.trim();
   if (!name) throw new Error("Product name is required.");
   if (!Number.isFinite(input.selling_price) || input.selling_price < 0) {
     throw new Error("Enter a valid selling price.");
   }
 
-  const { error } = await supabase.from("products").insert({
-    name,
-    selling_price: input.selling_price,
-    cost_price: input.cost_price ?? null,
-    category_id: input.category_id ?? null,
-    description: input.description?.trim() || null,
-    is_active: true,
-  });
+  const { data, error } = await supabase
+    .from("products")
+    .insert({
+      name,
+      selling_price: input.selling_price,
+      cost_price: input.cost_price ?? null,
+      category_id: input.category_id ?? null,
+      description: input.description?.trim() || null,
+      image_path: input.image_path ?? null,
+      is_active: true,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  return data.id;
 }
 
 export async function setProductActive(id: string, isActive: boolean) {
@@ -284,6 +291,7 @@ export async function updateProduct(
     cost_price?: number | null;
     category_id?: string | null;
     description?: string | null;
+    image_path?: string | null;
     is_active: boolean;
   }
 ) {
@@ -301,6 +309,7 @@ export async function updateProduct(
       cost_price: input.cost_price ?? null,
       category_id: input.category_id ?? null,
       description: input.description?.trim() || null,
+      image_path: input.image_path ?? null,
       is_active: input.is_active,
     })
     .eq("id", id);

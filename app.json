@@ -12,13 +12,13 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f4f6f8"
+      "backgroundColor": "#280a00"
     },
     "android": {
       "package": "com.teaspot.billing",
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#f4f6f8"
+        "backgroundColor": "#280a00"
       },
       "predictiveBackGestureEnabled": false
     },

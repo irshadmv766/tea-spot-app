@@ -1,5 +1,7 @@
 export type EntryKind = "income" | "expense";
 
+export type ShopPhase = "pre_opening" | "open";
+
 export type CategoryRow = { id: string; name: string };
 export type PaymentRow = { id: string; name: string };
 
@@ -37,6 +39,8 @@ export type ShopSettings = {
   address: string | null;
   currency: string;
   timezone: string;
+  initial_investment: number;
+  shop_phase: ShopPhase;
 };
 
 export type UserProfile = {

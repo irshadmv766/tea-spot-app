@@ -23,7 +23,8 @@
       "predictiveBackGestureEnabled": false
     },
     "plugins": [
-      "expo-image"
+      "expo-image",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

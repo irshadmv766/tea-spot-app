@@ -1,5 +1,4 @@
-import { Picker } from "@react-native-picker/picker";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,6 +13,7 @@ import {
 
 import { useFeedback } from "../feedback/FeedbackProvider";
 import { ScreenHeader } from "../ui/ScreenHeader";
+import { SearchableSelect } from "../ui/SearchableSelect";
 import {
   createManualEntry,
   deleteExpense,
@@ -60,6 +60,22 @@ export function EntryScreen({
   const [saving, setSaving] = useState(false);
   const [entryDate, setEntryDate] = useState<string | null>(null);
   const isEdit = Boolean(editId);
+
+  const categoryOptions = useMemo(
+    () => [
+      { label: "— None —", value: "" },
+      ...categories.map((c) => ({ label: c.name, value: c.id })),
+    ],
+    [categories]
+  );
+
+  const paymentOptions = useMemo(
+    () =>
+      payments.length === 0
+        ? [{ label: "— None —", value: "" }]
+        : payments.map((p) => ({ label: p.name, value: p.id })),
+    [payments]
+  );
 
   const refreshCatalog = useCallback(async () => {
     setLoadingCatalog(true);
@@ -261,33 +277,20 @@ export function EntryScreen({
           />
 
           <Text style={styles.label}>Category (optional)</Text>
-          <View style={styles.pickerWrap}>
-            <Picker
-              selectedValue={categoryId}
-              onValueChange={(v) => setCategoryId(String(v))}
-            >
-              <Picker.Item label="— None —" value="" />
-              {categories.map((c) => (
-                <Picker.Item key={c.id} label={c.name} value={c.id} />
-              ))}
-            </Picker>
-          </View>
+          <SearchableSelect
+            value={categoryId}
+            onValueChange={setCategoryId}
+            options={categoryOptions}
+            placeholder="— None —"
+          />
 
           <Text style={styles.label}>Payment</Text>
-          <View style={styles.pickerWrap}>
-            <Picker
-              selectedValue={paymentId}
-              onValueChange={(v) => setPaymentId(String(v))}
-            >
-              {payments.length === 0 ? (
-                <Picker.Item label="— None —" value="" />
-              ) : (
-                payments.map((p) => (
-                  <Picker.Item key={p.id} label={p.name} value={p.id} />
-                ))
-              )}
-            </Picker>
-          </View>
+          <SearchableSelect
+            value={paymentId}
+            onValueChange={setPaymentId}
+            options={paymentOptions}
+            placeholder="Select payment"
+          />
 
           <Text style={styles.label}>Note (optional)</Text>
           <TextInput
@@ -366,13 +369,6 @@ const styles = StyleSheet.create({
   },
   amountInput: { fontSize: 28, fontWeight: "700" },
   noteInput: { minHeight: 72, textAlignVertical: "top" },
-  pickerWrap: {
-    borderWidth: 1,
-    borderColor: "#d0d5dd",
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    overflow: "hidden",
-  },
   saveBtn: {
     marginTop: 20,
     backgroundColor: colors.primary,

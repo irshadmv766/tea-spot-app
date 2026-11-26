@@ -28,6 +28,7 @@ import {
   getDayTransactions,
   getExpenseByCategory,
   getPeriodTotals,
+  getShopSettings,
 } from "../../lib/queries";
 import { useSafeLayout } from "../../lib/safe-layout";
 import { categoryColors, colors, netHero, radius } from "../../lib/theme";
@@ -35,6 +36,7 @@ import type {
   DayTransactionRow,
   EntryKind,
   ExpenseCategoryRow,
+  ShopPhase,
 } from "../../lib/types";
 
 type Props = {
@@ -69,6 +71,7 @@ export function TodayScreen({
   const [incomeIn, setIncomeIn] = useState(0);
   const [expenseOut, setExpenseOut] = useState(0);
   const [salesCount, setSalesCount] = useState(0);
+  const [shopPhase, setShopPhase] = useState<ShopPhase>("pre_opening");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -85,10 +88,11 @@ export function TodayScreen({
 
   const load = useCallback(async () => {
     const r = getRangeForDayOffset(dayOffset);
-    const [list, totals, categories] = await Promise.all([
+    const [list, totals, categories, settings] = await Promise.all([
       getDayTransactions(r),
       getPeriodTotals(r),
       getExpenseByCategory(r),
+      getShopSettings(),
     ]);
     setRows(list);
     setBreakdown(categories);
@@ -96,6 +100,7 @@ export function TodayScreen({
     setExpenseOut(totals.expensesTotal);
     setNet(totals.netTotal);
     setSalesCount(totals.salesCount);
+    setShopPhase(settings?.shop_phase === "open" ? "open" : "pre_opening");
   }, [dayOffset]);
 
   useEffect(() => {
@@ -114,25 +119,44 @@ export function TodayScreen({
     }
   };
 
-  const badgeText =
-    net < 0
+  const preOpening = shopPhase === "pre_opening";
+  const setupFocus = preOpening && incomeIn === 0;
+
+  const badgeText = setupFocus
+    ? "Shop opening soon"
+    : net < 0
       ? "Spent more than earned"
       : net > 0
         ? "Earned more than spent"
         : "Balanced";
 
-  const heroTheme =
-    net < 0
+  const heroTheme = setupFocus
+    ? netHero.balanced
+    : net < 0
       ? netHero.negative
       : net > 0
         ? netHero.positive
         : netHero.balanced;
 
-  const netLabel = dayOffset === 0 ? "Net today" : "Net";
+  const netLabel =
+    setupFocus && dayOffset === 0
+      ? "Spend today"
+      : setupFocus
+        ? "Spend"
+        : dayOffset === 0
+          ? "Net today"
+          : "Net";
 
-  const subtitle = `${rows.length} transaction${rows.length === 1 ? "" : "s"} · ${
-    salesCount === 0 ? "no sales yet" : `${salesCount} sale${salesCount === 1 ? "" : "s"}`
-  }`;
+  const heroAmount = setupFocus ? formatMoney(expenseOut) : formatSignedMoney(net);
+  const heroAmountColor = setupFocus ? colors.expense : heroTheme.amount;
+
+  const subtitle = setupFocus
+    ? `${rows.length} expense${rows.length === 1 ? "" : "s"} · sales start after opening`
+    : `${rows.length} transaction${rows.length === 1 ? "" : "s"} · ${
+        salesCount === 0
+          ? "no sales yet"
+          : `${salesCount} sale${salesCount === 1 ? "" : "s"}`
+      }`;
 
   const expenseTotal = breakdown.reduce((a, b) => a + b.total, 0);
 
@@ -322,8 +346,8 @@ export function TodayScreen({
                 </Text>
               </View>
             </View>
-            <Text style={[styles.netAmount, { color: heroTheme.amount }]}>
-              {formatSignedMoney(net)}
+            <Text style={[styles.netAmount, { color: heroAmountColor }]}>
+              {heroAmount}
             </Text>
             <Text style={styles.heroSub}>{subtitle}</Text>
           </LinearGradient>

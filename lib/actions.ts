@@ -392,9 +392,16 @@ export async function saveShopSettings(input: {
   address?: string | null;
   currency: string;
   timezone: string;
+  initial_investment?: number;
+  shop_phase?: "pre_opening" | "open";
 }) {
   const shop_name = input.shop_name.trim();
   if (!shop_name) throw new Error("Shop name is required.");
+
+  const rawInvestment = input.initial_investment ?? 0;
+  if (!Number.isFinite(rawInvestment) || rawInvestment < 0) {
+    throw new Error("Startup investment must be a valid amount.");
+  }
 
   const { error } = await supabase
     .from("shop_settings")
@@ -404,6 +411,9 @@ export async function saveShopSettings(input: {
       address: input.address?.trim() || null,
       currency: input.currency.trim(),
       timezone: input.timezone.trim(),
+      initial_investment: rawInvestment,
+      shop_phase:
+        input.shop_phase === "open" ? "open" : "pre_opening",
     })
     .eq("id", SHOP_SETTINGS_ID);
 

@@ -1,6 +1,7 @@
 const SHOP_TZ = "Asia/Kolkata";
 
-export type ReportPreset = "today" | "week" | "month";
+export type FixedReportPreset = "today" | "week" | "month";
+export type ReportPreset = FixedReportPreset | "custom";
 
 export type DateRange = { from: string; to: string; label: string };
 
@@ -25,7 +26,43 @@ function addDaysYmd(ymd: string, delta: number): string {
   return utc.toISOString().slice(0, 10);
 }
 
-export function getRangeForPreset(preset: ReportPreset): DateRange {
+export function ymdToDate(ymd: string): Date {
+  return new Date(`${ymd}T12:00:00+05:30`);
+}
+
+export function dateToShopYmd(date: Date): string {
+  return shopYmd(date);
+}
+
+export function defaultCustomRangeYmd(): { fromYmd: string; toYmd: string } {
+  const today = shopYmd();
+  return { fromYmd: addDaysYmd(today, -6), toYmd: today };
+}
+
+export function getRangeForYmdSpan(fromYmd: string, toYmd: string): DateRange {
+  const start = fromYmd <= toYmd ? fromYmd : toYmd;
+  const end = fromYmd <= toYmd ? toYmd : fromYmd;
+  const { from } = boundsForYmd(start);
+  const { to } = boundsForYmd(end);
+  const label =
+    start === end
+      ? formatDayShortFromYmd(start)
+      : `${formatDayShortFromYmd(start)} – ${formatDayShortFromYmd(end)}`;
+  return { from, to, label };
+}
+
+export function getReportRange(
+  preset: ReportPreset,
+  customFromYmd: string,
+  customToYmd: string
+): DateRange {
+  if (preset === "custom") {
+    return getRangeForYmdSpan(customFromYmd, customToYmd);
+  }
+  return getRangeForPreset(preset);
+}
+
+export function getRangeForPreset(preset: FixedReportPreset): DateRange {
   const today = shopYmd();
   if (preset === "today") {
     const { from, to } = boundsForYmd(today);
@@ -67,6 +104,12 @@ export function formatDayShortFromYmd(ymd: string): string {
     day: "numeric",
     month: "short",
   }).format(date);
+}
+
+export function getAllTimeRange(): DateRange {
+  const today = shopYmd();
+  const { to } = boundsForYmd(today);
+  return { from: new Date(0).toISOString(), to, label: "All time" };
 }
 
 export function getRangeForDayOffset(offset: number): DateRange {

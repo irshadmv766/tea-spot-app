@@ -345,7 +345,9 @@ export async function listProductCategories(): Promise<CategoryRow[]> {
 export async function getShopSettings(): Promise<ShopSettings | null> {
   const { data, error } = await supabase
     .from("shop_settings")
-    .select("id, shop_name, phone, address, currency, timezone")
+    .select(
+      "id, shop_name, phone, address, currency, timezone, initial_investment, shop_phase"
+    )
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();

@@ -1,4 +1,3 @@
-import { Picker } from "@react-native-picker/picker";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -29,6 +28,7 @@ import { useSafeLayout } from "../../lib/safe-layout";
 import { colors, shared } from "../../lib/theme";
 import { useFeedback } from "../feedback/FeedbackProvider";
 import { ScreenHeader } from "../ui/ScreenHeader";
+import { SearchableSelect } from "../ui/SearchableSelect";
 
 type Props = {
   refreshKey: number;
@@ -57,6 +57,11 @@ export function SaleScreen({
   const isEdit = Boolean(editSaleId);
 
   const itemsSubtotal = useMemo(() => cartLinesTotal(cart), [cart]);
+
+  const paymentOptions = useMemo(
+    () => payments.map((p) => ({ label: p.name, value: p.id })),
+    [payments]
+  );
 
   useEffect(() => {
     if (!manualTotalLocked) {
@@ -316,16 +321,12 @@ export function SaleScreen({
               </Text>
 
               <Text style={[shared.muted, { marginTop: 12 }]}>Payment</Text>
-              <View style={styles.pickerWrap}>
-                <Picker
-                  selectedValue={paymentId}
-                  onValueChange={(v) => setPaymentId(String(v))}
-                >
-                  {payments.map((p) => (
-                    <Picker.Item key={p.id} label={p.name} value={p.id} />
-                  ))}
-                </Picker>
-              </View>
+              <SearchableSelect
+                value={paymentId}
+                onValueChange={setPaymentId}
+                options={paymentOptions}
+                placeholder="Select payment"
+              />
 
               <Pressable
                 style={[shared.primaryBtn, saving && shared.btnDisabled, { marginTop: 12 }]}
@@ -542,13 +543,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     color: colors.textSecondary,
-  },
-  pickerWrap: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: "#fff",
   },
   empty: { textAlign: "center", color: colors.textSecondary, marginTop: 24 },
 });

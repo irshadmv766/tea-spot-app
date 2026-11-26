@@ -1,5 +1,4 @@
-import { Picker } from "@react-native-picker/picker";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -48,6 +47,17 @@ import {
 } from "../../lib/product-image";
 import { ProductPhotoField } from "../ui/ProductPhotoField";
 import { ScreenHeader } from "../ui/ScreenHeader";
+import { SearchableSelect } from "../ui/SearchableSelect";
+
+const CATEGORY_TYPE_OPTIONS: { label: string; value: EntryKind }[] = [
+  { label: "Income", value: "income" },
+  { label: "Expense", value: "expense" },
+];
+
+const SHOP_PHASE_OPTIONS = [
+  { label: "Pre-opening (setup)", value: "pre_opening" as const },
+  { label: "Open for sales", value: "open" as const },
+];
 
 type Section = "products" | "categories" | "shop" | "account";
 
@@ -95,6 +105,16 @@ export function SettingsScreen({
   const [shopName, setShopName] = useState("");
   const [shopPhone, setShopPhone] = useState("");
   const [shopAddress, setShopAddress] = useState("");
+  const [shopInitialInvestment, setShopInitialInvestment] = useState("");
+  const [shopPhase, setShopPhase] = useState<"pre_opening" | "open">(
+    "pre_opening"
+  );
+
+  const [savingShop, setSavingShop] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [savingProductForm, setSavingProductForm] = useState(false);
+  const [savingCategoryForm, setSavingCategoryForm] = useState(false);
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -114,6 +134,14 @@ export function SettingsScreen({
   const [productImagePath, setProductImagePath] = useState<string | null>(null);
   const [productImageRemoved, setProductImageRemoved] = useState(false);
   const [pickingProductPhoto, setPickingProductPhoto] = useState(false);
+
+  const productCategoryOptions = useMemo(
+    () => [
+      { label: "— None —", value: "" },
+      ...productCategories.map((c) => ({ label: c.name, value: c.id })),
+    ],
+    [productCategories]
+  );
 
   function resetProductFields() {
     setNewProductName("");
@@ -224,6 +252,9 @@ export function SettingsScreen({
       setShopName(settings.shop_name);
       setShopPhone(settings.phone ?? "");
       setShopAddress(settings.address ?? "");
+      const inv = Number(settings.initial_investment ?? 0);
+      setShopInitialInvestment(inv > 0 ? String(inv) : "");
+      setShopPhase(settings.shop_phase === "open" ? "open" : "pre_opening");
     }
   }, [userId]);
 
@@ -251,6 +282,7 @@ export function SettingsScreen({
   async function handleAddProduct() {
     const price = Number(newProductPrice);
     const cost = newProductCost ? Number(newProductCost) : null;
+    setSavingProductForm(true);
     try {
       const id = await createProduct({
         name: newProductName,
@@ -285,10 +317,13 @@ export function SettingsScreen({
         "Couldn't save right now",
         e instanceof Error ? e.message : "Could not save."
       );
+    } finally {
+      setSavingProductForm(false);
     }
   }
 
   async function handleAddCategory() {
+    setSavingCategoryForm(true);
     try {
       await createCategory({
         name: newCategoryName,
@@ -306,6 +341,8 @@ export function SettingsScreen({
         "Couldn't save right now",
         e instanceof Error ? e.message : "Could not save."
       );
+    } finally {
+      setSavingCategoryForm(false);
     }
   }
 
@@ -313,6 +350,7 @@ export function SettingsScreen({
     if (!editingProductId) return;
     const price = Number(newProductPrice);
     const cost = newProductCost ? Number(newProductCost) : null;
+    setSavingProductForm(true);
     try {
       const imagePath = await resolveProductImagePath(editingProductId);
       await updateProduct(editingProductId, {
@@ -333,6 +371,8 @@ export function SettingsScreen({
         "Couldn't save right now",
         e instanceof Error ? e.message : "Could not save."
       );
+    } finally {
+      setSavingProductForm(false);
     }
   }
 
@@ -359,6 +399,7 @@ export function SettingsScreen({
 
   async function handleUpdateCategory() {
     if (!editingCategoryId) return;
+    setSavingCategoryForm(true);
     try {
       await updateCategory(editingCategoryId, {
         name: newCategoryName,
@@ -375,6 +416,8 @@ export function SettingsScreen({
         "Couldn't save right now",
         e instanceof Error ? e.message : "Could not save."
       );
+    } finally {
+      setSavingCategoryForm(false);
     }
   }
 
@@ -400,6 +443,13 @@ export function SettingsScreen({
   }
 
   async function handleSaveShop() {
+    const trimmed = shopInitialInvestment.trim();
+    const initial_investment = trimmed === "" ? 0 : Number(trimmed);
+    if (!Number.isFinite(initial_investment) || initial_investment < 0) {
+      feedback.error("Invalid amount", "Startup investment must be 0 or more.");
+      return;
+    }
+    setSavingShop(true);
     try {
       await saveShopSettings({
         shop_name: shopName,
@@ -407,6 +457,8 @@ export function SettingsScreen({
         address: shopAddress,
         currency: shop?.currency ?? "INR",
         timezone: shop?.timezone ?? "Asia/Kolkata",
+        initial_investment,
+        shop_phase: shopPhase,
       });
       onChanged();
       feedback.success("Shop details updated");
@@ -415,10 +467,13 @@ export function SettingsScreen({
         "Couldn't save right now",
         e instanceof Error ? e.message : "Could not save."
       );
+    } finally {
+      setSavingShop(false);
     }
   }
 
   async function handleSaveProfile() {
+    setSavingProfile(true);
     try {
       await saveUserProfile(userId, fullName);
       feedback.success("Profile updated");
@@ -427,10 +482,13 @@ export function SettingsScreen({
         "Couldn't save right now",
         e instanceof Error ? e.message : "Could not save."
       );
+    } finally {
+      setSavingProfile(false);
     }
   }
 
   async function handleChangePassword() {
+    setSavingPassword(true);
     try {
       await changePassword(newPassword, confirmPassword);
       setNewPassword("");
@@ -442,6 +500,8 @@ export function SettingsScreen({
         "Couldn't update",
         e instanceof Error ? e.message : "Could not update."
       );
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -525,17 +585,12 @@ export function SettingsScreen({
                     keyboardType="decimal-pad"
                   />
                   <Text style={styles.fieldLabel}>Category (optional)</Text>
-                  <View style={styles.pickerWrap}>
-                    <Picker
-                      selectedValue={newProductCategoryId}
-                      onValueChange={(v) => setNewProductCategoryId(String(v))}
-                    >
-                      <Picker.Item label="— None —" value="" />
-                      {productCategories.map((c) => (
-                        <Picker.Item key={c.id} label={c.name} value={c.id} />
-                      ))}
-                    </Picker>
-                  </View>
+                  <SearchableSelect
+                    value={newProductCategoryId}
+                    onValueChange={setNewProductCategoryId}
+                    options={productCategoryOptions}
+                    placeholder="— None —"
+                  />
                   <Field
                     label="Description (optional)"
                     value={newProductDesc}
@@ -571,14 +626,22 @@ export function SettingsScreen({
                     </View>
                   ) : null}
                   <Pressable
-                    style={shared.primaryBtn}
+                    style={[
+                      shared.primaryBtn,
+                      savingProductForm && shared.btnDisabled,
+                    ]}
                     onPress={
                       editingProductId ? handleUpdateProduct : handleAddProduct
                     }
+                    disabled={savingProductForm}
                   >
-                    <Text style={shared.primaryBtnText}>
-                      {editingProductId ? "Save changes" : "Save product"}
-                    </Text>
+                    {savingProductForm ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={shared.primaryBtnText}>
+                        {editingProductId ? "Save changes" : "Save product"}
+                      </Text>
+                    )}
                   </Pressable>
                   {editingProductId ? (
                     <Pressable
@@ -665,15 +728,11 @@ export function SettingsScreen({
                     onChange={setNewCategoryName}
                   />
                   <Text style={styles.fieldLabel}>Type</Text>
-                  <View style={styles.pickerWrap}>
-                    <Picker
-                      selectedValue={newCategoryType}
-                      onValueChange={(v) => setNewCategoryType(v as EntryKind)}
-                    >
-                      <Picker.Item label="Income" value="income" />
-                      <Picker.Item label="Expense" value="expense" />
-                    </Picker>
-                  </View>
+                  <SearchableSelect
+                    value={newCategoryType}
+                    onValueChange={setNewCategoryType}
+                    options={CATEGORY_TYPE_OPTIONS}
+                  />
                   <Field
                     label="Description (optional)"
                     value={newCategoryDesc}
@@ -690,16 +749,24 @@ export function SettingsScreen({
                     </View>
                   ) : null}
                   <Pressable
-                    style={shared.primaryBtn}
+                    style={[
+                      shared.primaryBtn,
+                      savingCategoryForm && shared.btnDisabled,
+                    ]}
                     onPress={
                       editingCategoryId
                         ? handleUpdateCategory
                         : handleAddCategory
                     }
+                    disabled={savingCategoryForm}
                   >
-                    <Text style={shared.primaryBtnText}>
-                      {editingCategoryId ? "Save changes" : "Save category"}
-                    </Text>
+                    {savingCategoryForm ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={shared.primaryBtnText}>
+                        {editingCategoryId ? "Save changes" : "Save category"}
+                      </Text>
+                    )}
                   </Pressable>
                   {editingCategoryId ? (
                     <Pressable
@@ -767,15 +834,43 @@ export function SettingsScreen({
                 onChange={setShopAddress}
                 multiline
               />
+              <Text style={styles.fieldLabel}>Shop status</Text>
+              <SearchableSelect
+                value={shopPhase}
+                onValueChange={setShopPhase}
+                options={SHOP_PHASE_OPTIONS}
+              />
               <Text style={shared.muted}>
+                Pre-opening: log setup expenses now. Switch to open when you
+                start selling.
+              </Text>
+              <Field
+                label="Startup investment (₹)"
+                value={shopInitialInvestment}
+                onChange={setShopInitialInvestment}
+                keyboardType="decimal-pad"
+              />
+              <Text style={shared.muted}>
+                Record only — not included in income, expense, or net totals.
+              </Text>
+              <Text style={[shared.muted, { marginTop: 8 }]}>
                 Currency: {shop?.currency ?? "INR"} · Timezone:{" "}
                 {shop?.timezone ?? "Asia/Kolkata"}
               </Text>
               <Pressable
-                style={[shared.primaryBtn, { marginTop: 16 }]}
+                style={[
+                  shared.primaryBtn,
+                  { marginTop: 16 },
+                  savingShop && shared.btnDisabled,
+                ]}
                 onPress={handleSaveShop}
+                disabled={savingShop}
               >
-                <Text style={shared.primaryBtnText}>Save shop</Text>
+                {savingShop ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={shared.primaryBtnText}>Save shop</Text>
+                )}
               </Pressable>
             </View>
           ) : null}
@@ -787,10 +882,19 @@ export function SettingsScreen({
                 <Text style={styles.readOnly}>{userEmail}</Text>
                 <Field label="Full name" value={fullName} onChange={setFullName} />
                 <Pressable
-                  style={[shared.primaryBtn, { marginTop: 8 }]}
+                  style={[
+                    shared.primaryBtn,
+                    { marginTop: 8 },
+                    savingProfile && shared.btnDisabled,
+                  ]}
                   onPress={handleSaveProfile}
+                  disabled={savingProfile}
                 >
-                  <Text style={shared.primaryBtnText}>Save profile</Text>
+                  {savingProfile ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={shared.primaryBtnText}>Save profile</Text>
+                  )}
                 </Pressable>
               </View>
 
@@ -830,10 +934,18 @@ export function SettingsScreen({
                       secure
                     />
                     <Pressable
-                      style={shared.primaryBtn}
+                      style={[
+                        shared.primaryBtn,
+                        savingPassword && shared.btnDisabled,
+                      ]}
                       onPress={handleChangePassword}
+                      disabled={savingPassword}
                     >
-                      <Text style={shared.primaryBtnText}>Update password</Text>
+                      {savingPassword ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={shared.primaryBtnText}>Update password</Text>
+                      )}
                     </Pressable>
                   </>
                 ) : (
@@ -984,13 +1096,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fafafa",
   },
   inputMultiline: { minHeight: 72, textAlignVertical: "top" },
-  pickerWrap: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    overflow: "hidden",
-    backgroundColor: "#fff",
-  },
   listCard: {
     flexDirection: "row",
     alignItems: "center",

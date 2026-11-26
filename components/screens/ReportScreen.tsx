@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -22,14 +22,17 @@ import type {
   PeriodTotals,
 } from "../../lib/types";
 import {
+  defaultCustomRangeYmd,
   formatDayLocal,
   formatTimeLocal,
-  getRangeForPreset,
+  getReportRange,
+  shopTodayYmd,
   type ReportPreset,
 } from "../../lib/dates";
 import { formatMoney } from "../../lib/format";
 import { useSafeLayout } from "../../lib/safe-layout";
 import { colors, shared } from "../../lib/theme";
+import { DateField } from "../ui/DateField";
 import { ScreenHeader } from "../ui/ScreenHeader";
 
 type Props = {
@@ -42,6 +45,9 @@ type ListTab = "summary" | "income" | "expense";
 export function ReportScreen({ refreshKey, onBack }: Props) {
   const { scrollBottom } = useSafeLayout();
   const [preset, setPreset] = useState<ReportPreset>("today");
+  const defaultCustom = useMemo(() => defaultCustomRangeYmd(), []);
+  const [customFromYmd, setCustomFromYmd] = useState(defaultCustom.fromYmd);
+  const [customToYmd, setCustomToYmd] = useState(defaultCustom.toYmd);
   const [listTab, setListTab] = useState<ListTab>("summary");
   const [totals, setTotals] = useState<PeriodTotals | null>(null);
   const [breakdown, setBreakdown] = useState<{ name: string; total: number }[]>(
@@ -52,8 +58,12 @@ export function ReportScreen({ refreshKey, onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const range = useMemo(
+    () => getReportRange(preset, customFromYmd, customToYmd),
+    [preset, customFromYmd, customToYmd]
+  );
+
   const load = useCallback(async () => {
-    const range = getRangeForPreset(preset);
     const [t, b, inc, exp] = await Promise.all([
       getPeriodTotals(range),
       getExpenseByCategory(range),
@@ -64,7 +74,7 @@ export function ReportScreen({ refreshKey, onBack }: Props) {
     setBreakdown(b);
     setIncome(inc);
     setExpenses(exp);
-  }, [preset]);
+  }, [range]);
 
   useEffect(() => {
     setLoading(true);
@@ -82,18 +92,30 @@ export function ReportScreen({ refreshKey, onBack }: Props) {
     }
   };
 
-  const rangeLabel = getRangeForPreset(preset).label;
+  const rangeLabel = range.label;
+  const todayYmd = shopTodayYmd();
+
+  function onCustomFromChange(ymd: string) {
+    setCustomFromYmd(ymd);
+    if (ymd > customToYmd) setCustomToYmd(ymd);
+  }
+
+  function onCustomToChange(ymd: string) {
+    setCustomToYmd(ymd);
+    if (ymd < customFromYmd) setCustomFromYmd(ymd);
+  }
 
   return (
     <View style={shared.screen}>
       <ScreenHeader title="Reports" onBack={onBack} />
 
-      <View style={styles.presets}>
+      <View style={styles.presetRow}>
         {(
           [
             ["today", "Today"],
             ["week", "7 days"],
             ["month", "Month"],
+            ["custom", "Custom"],
           ] as const
         ).map(([key, label]) => (
           <Pressable
@@ -112,6 +134,25 @@ export function ReportScreen({ refreshKey, onBack }: Props) {
           </Pressable>
         ))}
       </View>
+
+      {preset === "custom" ? (
+        <View style={styles.customRange}>
+          <DateField
+            label="From"
+            valueYmd={customFromYmd}
+            onChangeYmd={onCustomFromChange}
+            maximumDate={customToYmd}
+          />
+          <Text style={styles.rangeDash}>–</Text>
+          <DateField
+            label="To"
+            valueYmd={customToYmd}
+            onChangeYmd={onCustomToChange}
+            minimumDate={customFromYmd}
+            maximumDate={todayYmd}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.listTabs}>
         {(
@@ -259,13 +300,28 @@ function Row({
 }
 
 const styles = StyleSheet.create({
-  presets: {
+  presetRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     paddingHorizontal: 20,
     marginBottom: 10,
   },
+  customRange: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  rangeDash: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    paddingBottom: 14,
+  },
   presetChip: {
+    alignSelf: "flex-start",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,

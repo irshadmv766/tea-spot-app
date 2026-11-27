@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,6 +24,8 @@ import {
   loadEntryCatalog,
   updateManualEntry,
 } from "../../lib/actions";
+import type { ReceiptImageSource } from "../../lib/receipt-scanner";
+import { scanReceiptFromImage } from "../../lib/receipt-scanner";
 import { useSafeLayout } from "../../lib/safe-layout";
 import { colors, shared } from "../../lib/theme";
 import type {
@@ -30,6 +33,8 @@ import type {
   EntryKind,
   PaymentRow,
 } from "../../lib/types";
+
+type ScanField = "title" | "amount" | "note";
 
 type Props = {
   userId: string;
@@ -59,7 +64,10 @@ export function EntryScreen({
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [saving, setSaving] = useState(false);
   const [entryDate, setEntryDate] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanHints, setScanHints] = useState<Set<ScanField>>(new Set());
   const isEdit = Boolean(editId);
+  const canScanReceipt = kind === "expense" && !isEdit;
 
   const categoryOptions = useMemo(
     () => [
@@ -142,7 +150,90 @@ export function EntryScreen({
     setAmount("");
     setNote("");
     setCategoryId("");
+    setScanHints(new Set());
     if (payments[0]) setPaymentId(payments[0].id);
+  }
+
+  function clearScanHint(field: ScanField) {
+    setScanHints((prev) => {
+      if (!prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+  }
+
+  function applyScannedFields(parsed: {
+    merchantName: string | null;
+    totalAmount: number | null;
+    description: string | null;
+  }) {
+    const hints = new Set<ScanField>();
+
+    if (parsed.merchantName) {
+      setTitle(parsed.merchantName);
+      hints.add("title");
+    }
+    if (parsed.totalAmount != null) {
+      setAmount(String(parsed.totalAmount));
+      hints.add("amount");
+    }
+    if (parsed.description) {
+      setNote(parsed.description);
+      hints.add("note");
+    }
+
+    setScanHints(hints);
+
+    if (hints.size === 0) {
+      feedback.error(
+        "Couldn't read receipt",
+        "We found text but could not detect merchant, total, or notes. Enter details manually."
+      );
+      return;
+    }
+
+    feedback.success(
+      "Receipt scanned — review highlighted fields before saving."
+    );
+  }
+
+  async function runReceiptScan(source: ReceiptImageSource) {
+    setScanning(true);
+    try {
+      const parsed = await scanReceiptFromImage(source);
+      if (!parsed) return;
+      applyScannedFields(parsed);
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Could not process this receipt.";
+      feedback.error("Scan failed", message);
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  function promptScanReceipt() {
+    if (scanning) return;
+    feedback.choose({
+      title: "Scan receipt",
+      subtitle:
+        "Capture or choose a receipt photo. Text is recognized on your device only.",
+      actions: [
+        {
+          label: "Take photo",
+          onPress: () => {
+            void runReceiptScan("camera");
+          },
+        },
+        {
+          label: "Choose from gallery",
+          onPress: () => {
+            void runReceiptScan("library");
+          },
+        },
+      ],
+    });
   }
 
   async function save() {
@@ -259,19 +350,57 @@ export function EntryScreen({
           contentContainerStyle={[styles.form, { paddingBottom: scrollBottom }]}
           keyboardShouldPersistTaps="handled"
         >
+          {canScanReceipt ? (
+            <View style={styles.scanSection}>
+              <Pressable
+                style={[styles.scanBtn, scanning && styles.btnDisabled]}
+                onPress={promptScanReceipt}
+                disabled={scanning || saving}
+              >
+                {scanning ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="receipt-text-outline"
+                    size={22}
+                    color={colors.primary}
+                  />
+                )}
+                <Text style={styles.scanBtnText}>
+                  {scanning ? "Reading receipt…" : "Scan receipt"}
+                </Text>
+              </Pressable>
+              {scanHints.size > 0 ? (
+                <Text style={styles.scanHint}>
+                  Highlighted fields were filled from the receipt — please verify.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
           <Text style={styles.label}>Title</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, scanHints.has("title") && styles.inputScanFilled]}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(v) => {
+              clearScanHint("title");
+              setTitle(v);
+            }}
             placeholder={kind === "income" ? "e.g. Cash sale" : "e.g. Milk"}
           />
 
           <Text style={styles.label}>Amount (₹)</Text>
           <TextInput
-            style={[styles.input, styles.amountInput]}
+            style={[
+              styles.input,
+              styles.amountInput,
+              scanHints.has("amount") && styles.inputScanFilled,
+            ]}
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={(v) => {
+              clearScanHint("amount");
+              setAmount(v);
+            }}
             keyboardType="decimal-pad"
             placeholder="0.00"
           />
@@ -294,9 +423,16 @@ export function EntryScreen({
 
           <Text style={styles.label}>Note (optional)</Text>
           <TextInput
-            style={[styles.input, styles.noteInput]}
+            style={[
+              styles.input,
+              styles.noteInput,
+              scanHints.has("note") && styles.inputScanFilled,
+            ]}
             value={note}
-            onChangeText={setNote}
+            onChangeText={(v) => {
+              clearScanHint("note");
+              setNote(v);
+            }}
             multiline
             placeholder="Short note"
           />
@@ -352,6 +488,32 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.primary },
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
   form: { padding: 20, gap: 6 },
+  scanSection: { marginBottom: 4, gap: 8 },
+  scanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: "#f4faf8",
+  },
+  scanBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  scanHint: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  inputScanFilled: {
+    borderColor: colors.primary,
+    backgroundColor: "#f4faf8",
+  },
   label: {
     fontSize: 14,
     fontWeight: "600",

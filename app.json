@@ -24,7 +24,14 @@
     },
     "plugins": [
       "expo-image",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Teaspot Billing to photograph receipts for expense scanning.",
+          "photosPermission": "Allow Teaspot Billing to choose receipt photos for expense scanning."
+        }
+      ]
     ]
   }
 }
